@@ -1,0 +1,27 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: course-service
+  data:
+    mongodb:
+      host: mongodb-course
+      port: 27017
+      database: coursedb
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: course-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

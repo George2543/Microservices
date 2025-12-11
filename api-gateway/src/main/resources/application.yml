@@ -1,0 +1,52 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: student-service
+          uri: lb://STUDENT-SERVICE
+          predicates:
+            - Path=/api/students/**
+          filters:
+            - StripPrefix=0
+        - id: professor-service
+          uri: lb://PROFESSOR-SERVICE
+          predicates:
+            - Path=/api/professors/**
+          filters:
+            - StripPrefix=0
+        - id: course-service
+          uri: lb://COURSE-SERVICE
+          predicates:
+            - Path=/api/courses/**
+          filters:
+            - StripPrefix=0
+        - id: grading-service
+          uri: lb://GRADING-SERVICE
+          predicates:
+            - Path=/api/grades/**
+          filters:
+            - StripPrefix=0
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

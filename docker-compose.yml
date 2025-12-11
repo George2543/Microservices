@@ -1,0 +1,176 @@
+version: '3.8'
+
+services:
+  # Service Registry
+  eureka-server:
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - university-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - university-network
+
+  # PostgreSQL for Student Service
+  postgres-student:
+    image: postgres:15-alpine
+    container_name: postgres-student
+    environment:
+      POSTGRES_DB: studentdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-student-data:/var/lib/postgresql/data
+    networks:
+      - university-network
+
+  # Student Service
+  student-service:
+    build:
+      context: ./student-service
+      dockerfile: Dockerfile
+    container_name: student-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-student:5432/studentdb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres-student:
+        condition: service_started
+    networks:
+      - university-network
+
+  # MySQL for Professor Service
+  mysql-professor:
+    image: mysql:8.0
+    container_name: mysql-professor
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: professordb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-professor-data:/var/lib/mysql
+    networks:
+      - university-network
+
+  # Professor Service
+  professor-service:
+    build:
+      context: ./professor-service
+      dockerfile: Dockerfile
+    container_name: professor-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-professor:3306/professordb
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mysql-professor:
+        condition: service_started
+    networks:
+      - university-network
+
+  # MongoDB for Course Service
+  mongodb-course:
+    image: mongo:7.0
+    container_name: mongodb-course
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-course-data:/data/db
+    networks:
+      - university-network
+
+  # Course Service
+  course-service:
+    build:
+      context: ./course-service
+      dockerfile: Dockerfile
+    container_name: course-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_DATA_MONGODB_HOST=mongodb-course
+      - SPRING_DATA_MONGODB_PORT=27017
+      - SPRING_DATA_MONGODB_DATABASE=coursedb
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mongodb-course:
+        condition: service_started
+    networks:
+      - university-network
+
+  # Grading Service
+  grading-service:
+    build:
+      context: ./grading-service
+      dockerfile: Dockerfile
+    container_name: grading-service
+    ports:
+      - "8084:8084"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - university-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - university-network
+
+networks:
+  university-network:
+    driver: bridge
+
+volumes:
+  postgres-student-data:
+  mysql-professor-data:
+  mongodb-course-data:
